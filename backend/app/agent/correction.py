@@ -27,11 +27,19 @@ class CorrectionEngine:
         4. Triggers regression verification.
         """
         # Parse current version number
-        try:
-            major, minor = skill.version.split(".")
-            new_version = f"{major}.{int(minor) + 1}"
-        except Exception:
-            new_version = "1.1"
+        curr_ver = str(skill.version)
+        if "." in curr_ver:
+            try:
+                major, minor = curr_ver.split(".", 1)
+                new_version = f"{major}.{int(minor) + 1}"
+            except Exception:
+                new_version = "1.1"
+        else:
+            try:
+                new_version = str(int(curr_ver) + 1)
+            except Exception:
+                new_version = "2"
+
 
         # Update skill rules / exceptions
         updated_exceptions = list(skill.exceptions)

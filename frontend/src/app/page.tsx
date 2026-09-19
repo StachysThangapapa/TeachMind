@@ -15,20 +15,55 @@ import { MOCK_ACTIVITIES } from "@/lib/api/mockData";
 export default function AssistantDashboardPage() {
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<CanonicalSkill[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(true);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
   const [activities] = useState<ActivityEvent[]>(MOCK_ACTIVITIES);
   const [isLoading, setIsLoading] = useState(false);
-  const [timelineSteps, setTimelineSteps] = useState<ExecutionTimelineStep[]>([]);
+  const [timelineSteps, setTimelineSteps] = useState<ExecutionTimelineStep[]>(
+    [],
+  );
   const [result, setResult] = useState<TaskExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getSkills()
-      .then((data) => setSkills(data))
-      .catch((err) => console.error("Could not fetch skills:", err));
+    let cancelled = false;
+
+    const loadSkills = async () => {
+      setSkillsLoading(true);
+      setSkillsError(null);
+
+      try {
+        const data = await getSkills();
+
+        if (!cancelled) {
+          // getSkills() is responsible for converting
+          // { skills: [...] } into CanonicalSkill[].
+          setSkills(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Could not fetch skills:", err);
+
+        if (!cancelled) {
+          setSkills([]);
+          setSkillsError("Could not load Skill Memory.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSkillsLoading(false);
+        }
+      }
+    };
+
+    loadSkills();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSendQuery = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!query.trim() || isLoading) return;
 
     setIsLoading(true);
@@ -42,24 +77,32 @@ export default function AssistantDashboardPage() {
         (step) => {
           setTimelineSteps((prev) => {
             const index = prev.findIndex((s) => s.stage === step.stage);
+
             if (index >= 0) {
               const updated = [...prev];
               updated[index] = step;
               return updated;
             }
+
             return [...prev, step];
           });
-        }
+        },
       );
+
       setResult(executionResult);
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Execution failed. Could not reach backend.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Execution failed. Could not reach backend.",
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const samplePrompt = "A customer bought a damaged clearance product 4 days ago. What should I do?";
+  const samplePrompt =
+    "A customer bought a damaged clearance product 4 days ago. What should I do?";
 
   return (
     <div className="flex min-h-screen bg-[#090d16] text-slate-100">
@@ -83,7 +126,10 @@ export default function AssistantDashboardPage() {
               </p>
 
               {/* Ask Input Form */}
-              <form onSubmit={handleSendQuery} className="mt-6 flex flex-col sm:flex-row gap-3">
+              <form
+                onSubmit={handleSendQuery}
+                className="mt-6 flex flex-col sm:flex-row gap-3"
+              >
                 <div className="relative flex-1">
                   <input
                     type="text"
@@ -111,7 +157,9 @@ export default function AssistantDashboardPage() {
 
               {/* Sample Prompt Pill for Judges */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] text-slate-500">Quick Test Case:</span>
+                <span className="text-[11px] text-slate-500">
+                  Quick Test Case:
+                </span>
                 <button
                   type="button"
                   onClick={() => setQuery(samplePrompt)}
@@ -145,8 +193,8 @@ export default function AssistantDashboardPage() {
                             step.status === "completed"
                               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                               : step.status === "active"
-                              ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 animate-pulse"
-                              : "bg-slate-800 text-slate-500"
+                                ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 animate-pulse"
+                                : "bg-slate-800 text-slate-500"
                           }`}
                         >
                           {step.status === "completed" ? "✓" : idx + 1}
@@ -163,15 +211,17 @@ export default function AssistantDashboardPage() {
                               step.status === "active"
                                 ? "text-indigo-300"
                                 : step.status === "completed"
-                                ? "text-slate-200"
-                                : "text-slate-500"
+                                  ? "text-slate-200"
+                                  : "text-slate-500"
                             }`}
                           >
                             {step.label}
                           </span>
                         </div>
                         {step.detail && (
-                          <p className="text-[11px] text-slate-400">{step.detail}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {step.detail}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -192,7 +242,8 @@ export default function AssistantDashboardPage() {
                           : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
                       }`}
                     >
-                      {result.decision} {result.decision === "APPROVE" ? "✓" : "❌"}
+                      {result.decision}{" "}
+                      {result.decision === "APPROVE" ? "✓" : "❌"}
                     </span>
                   </div>
 
@@ -203,7 +254,9 @@ export default function AssistantDashboardPage() {
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-slate-400">Reason:</p>
+                  <p className="text-xs font-semibold text-slate-400">
+                    Reason:
+                  </p>
                   <p className="mt-0.5 text-sm font-medium text-slate-200 leading-relaxed">
                     {result.reason}
                   </p>
@@ -235,7 +288,10 @@ export default function AssistantDashboardPage() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 RECENT LEARNED SKILLS
               </h3>
-              <Link href="/skills" className="text-xs font-semibold text-indigo-400 hover:underline">
+              <Link
+                href="/skills"
+                className="text-xs font-semibold text-indigo-400 hover:underline"
+              >
                 View all skills →
               </Link>
             </div>
@@ -248,15 +304,21 @@ export default function AssistantDashboardPage() {
                   className="rounded-2xl border border-slate-800 bg-[#0f172a] p-4 hover:border-slate-700 transition"
                 >
                   <div className="flex items-start justify-between">
-                    <h4 className="text-sm font-bold text-white">{skill.displayName || skill.name}</h4>
+                    <h4 className="text-sm font-bold text-white">
+                      {skill.displayName || skill.name}
+                    </h4>
                     <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
                       {skill.version}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">{skill.category}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {skill.category}
+                  </p>
                   <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-emerald-400">
                     <Icons.Zap className="h-3 w-3" />
-                    <span>{Math.round((skill.confidence || 0.9) * 100)}% confidence</span>
+                    <span>
+                      {Math.round((skill.confidence || 0.9) * 100)}% confidence
+                    </span>
                   </div>
                 </Link>
               ))}
@@ -269,18 +331,28 @@ export default function AssistantDashboardPage() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 LEARNING ACTIVITY
               </h3>
-              <Link href="/activity" className="text-xs font-semibold text-indigo-400 hover:underline">
+              <Link
+                href="/activity"
+                className="text-xs font-semibold text-indigo-400 hover:underline"
+              >
                 Full activity log →
               </Link>
             </div>
 
             <div className="mt-4 divide-y divide-slate-800/80 rounded-2xl border border-slate-800 bg-[#0f172a] p-4">
               {activities.slice(0, 3).map((act) => (
-                <div key={act.id} className="flex items-start gap-3 py-3 first:pt-1 last:pb-1">
+                <div
+                  key={act.id}
+                  className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
+                >
                   <span className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-indigo-400" />
                   <div>
-                    <p className="text-xs font-semibold text-slate-200">{act.description}</p>
-                    <span className="text-[10px] text-slate-500">{act.timestamp}</span>
+                    <p className="text-xs font-semibold text-slate-200">
+                      {act.description}
+                    </p>
+                    <span className="text-[10px] text-slate-500">
+                      {act.timestamp}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -298,17 +370,23 @@ export default function AssistantDashboardPage() {
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-slate-800 bg-[#0f172a] p-5">
                 <p className="text-2xl font-bold text-white">12</p>
-                <p className="mt-1 text-xs font-semibold text-slate-400">Skills Learned</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  Skills Learned
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-[#0f172a] p-5">
                 <p className="text-2xl font-bold text-white">8</p>
-                <p className="mt-1 text-xs font-semibold text-slate-400">Corrections</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  Corrections
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-[#0f172a] p-5">
                 <p className="text-2xl font-bold text-white">94%</p>
-                <p className="mt-1 text-xs font-semibold text-slate-400">Average Confidence</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  Average Confidence
+                </p>
               </div>
             </div>
           </section>

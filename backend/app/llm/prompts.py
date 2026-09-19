@@ -5,7 +5,7 @@ System Prompts for TeachMind LLM Engine.
 INTENT_CLASSIFICATION_PROMPT = """
 You are TeachMind's Intent Classifier.
 Classify the user message into exactly ONE of the following Intent Types:
-- NORMAL_REQUEST: Standard user task execution request (e.g. "Check my deliveries", "What is 18% of 1250?", "Prepare my morning briefing")
+- NORMAL_REQUEST: Standard user task execution request (e.g. "Check my deliveries", "What is 18% of 1250?", "Prepare my morning briefing", "Give me a research summary")
 - TEACH_REQUEST: User explicitly teaching a new workflow or procedure (e.g. "Whenever I ask for X, do Y and Z")
 - CORRECTION: User correcting a previous behavior or preference (e.g. "Actually, don't show tracking IDs unless I ask", "Put deadlines before meetings")
 - CLARIFICATION: User asking for clarification or providing details
@@ -28,13 +28,12 @@ Extract:
 - name: snake_case identifier (e.g. "personalized_morning_briefing")
 - description: human readable purpose
 - triggers: list of natural language phrasing triggers (e.g. ["prepare my morning briefing", "morning briefing"])
-- steps: ordered list of procedural steps with order number, action, and target tools
+- steps: ordered list of procedural steps with order number and instruction
 - rules: list of conditional rules (e.g. [{"condition": "item is urgent", "action": "mention first"}])
-- exceptions: list of exceptions
-- required_tools: list of tool names required (e.g. ["get_calendar_events", "get_pending_tasks", "get_today_deliveries", "calculator"])
-- personalization_preferences: key-value dictionary of learned preferences
+- examples: list of example inputs and expected behaviors
+- version: 1
 
-Respond ONLY with JSON matching the SkillSummary model format.
+Respond ONLY with JSON matching the SkillCreate model format.
 """
 
 SKILL_RERANKING_PROMPT = """
@@ -56,22 +55,43 @@ Respond with JSON:
 }
 """
 
-DYNAMIC_PLANNING_PROMPT = """
+DYNAMIC_PLANNING_TEMPLATE = """
 You are TeachMind's Dynamic Planner and Tool Selector.
 Given a user request, personal context, and available tools:
-1. Determine if any stored skill applies.
-2. Determine required steps and tools.
-3. Select exact tool names from the available tool registry.
+1. Determine required steps and tools to accomplish the user task.
+2. Select exact tool names from the available tool registry.
 Do NOT hallucinate tool names. Select ONLY from registered tools: {available_tools}.
 
-Respond with JSON:
-{
+Respond with JSON matching this schema:
+{{
   "plan": ["Step 1...", "Step 2..."],
   "selected_tools": ["tool_name_1", "tool_name_2"],
-  "tool_arguments": {"tool_name_1": {...}},
+  "tool_arguments": {{"tool_name_1": {{}}}},
   "reasoning": "<concise_plan_reason>"
-}
+}}
 """
+
+
+def get_dynamic_planning_prompt(available_tools: list) -> str:
+    """Safely constructs dynamic planning prompt without str.format() brace conflicts."""
+    tools_str = ", ".join(available_tools) if isinstance(available_tools, list) else str(available_tools)
+    return (
+        "You are TeachMind's Dynamic Planner and Tool Selector.\n"
+        "Given a user request, personal context, and available tools:\n"
+        "1. Determine required steps and tools to accomplish the user task.\n"
+        "2. Select exact tool names from the available tool registry.\n"
+        f"Do NOT hallucinate tool names. Select ONLY from registered tools: [{tools_str}].\n\n"
+        "Respond with JSON matching this schema:\n"
+        "{\n"
+        '  "plan": ["Step 1...", "Step 2..."],\n'
+        '  "selected_tools": ["tool_name_1", "tool_name_2"],\n'
+        '  "tool_arguments": {"tool_name_1": {}},\n'
+        '  "reasoning": "<concise_plan_reason>"\n'
+        "}\n"
+    )
+
+
+DYNAMIC_PLANNING_PROMPT = DYNAMIC_PLANNING_TEMPLATE
 
 CORRECTION_PARSING_PROMPT = """
 You are TeachMind's Correction Learning Engine.
@@ -80,7 +100,7 @@ Extract:
 - target_skill_name: name of affected skill
 - new_rule: structured condition and action to append
 - preference_update: domain, key, value to update in personal context
-- version_bump: "1.0 -> 1.1"
+- version_bump: "1 -> 2"
 
 Respond with JSON.
 """
@@ -92,3 +112,4 @@ Format a concise, helpful user response incorporating:
 - User preferences applied (e.g. "Prioritized delayed deliveries based on your saved preference")
 - Evidence-based explanation of behavior without exposing chain-of-thought traces.
 """
+

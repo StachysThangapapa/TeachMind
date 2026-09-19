@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from backend.app.schemas.agent import SkillSummary, ParsedIntent, PersonalContext
 from backend.app.tools.registry import tool_registry
 from backend.app.llm.client import llm_client
-from backend.app.llm.prompts import DYNAMIC_PLANNING_PROMPT
+from backend.app.llm.prompts import get_dynamic_planning_prompt
 
 
 class DynamicPlanOutput(BaseModel):
@@ -33,6 +33,64 @@ class WorkflowPlanner:
         """
         q_lower = query.lower()
         available_tools = tool_registry.list_tool_names()
+
+        # If a stored canonical skill exists, build execution plan directly from its steps and rules
+        if skill is not None and getattr(skill, "steps", None):
+            plan_steps = []
+            selected_tools = []
+            tool_arguments: Dict[str, Dict[str, Any]] = {}
+
+            for s in skill.steps:
+                instr = s.get("instruction", "") if isinstance(s, dict) else getattr(s, "instruction", "")
+                step_num = s.get("step", len(plan_steps) + 1) if isinstance(s, dict) else getattr(s, "step", len(plan_steps) + 1)
+                action = s.get("action", "") if isinstance(s, dict) else getattr(s, "action", "")
+                
+                plan_steps.append(f"Step {step_num}: {instr or action}")
+                instr_lower = (instr or action).lower()
+
+                # Semantic tool matching from step instructions
+                if "calendar" in instr_lower or "meeting" in instr_lower:
+                    if "get_calendar_events" in available_tools and "get_calendar_events" not in selected_tools:
+                        selected_tools.append("get_calendar_events")
+                        tool_arguments["get_calendar_events"] = {"date": "today"}
+                if "task" in instr_lower or "pending" in instr_lower:
+                    if "get_pending_tasks" in available_tools and "get_pending_tasks" not in selected_tools:
+                        selected_tools.append("get_pending_tasks")
+                        tool_arguments["get_pending_tasks"] = {"user_id": context.user_id if context else "user_default"}
+                if "deliver" in instr_lower or "package" in instr_lower:
+                    if "get_today_deliveries" in available_tools and "get_today_deliveries" not in selected_tools:
+                        selected_tools.append("get_today_deliveries")
+                        tool_arguments["get_today_deliveries"] = {"date": "today"}
+                if "calc" in instr_lower or "%" in instr_lower:
+                    if "calculator" in available_tools and "calculator" not in selected_tools:
+                        selected_tools.append("calculator")
+                        tool_arguments["calculator"] = {"expression": query}
+                if "date" in instr_lower or "time" in instr_lower or "clock" in instr_lower:
+                    if "datetime_tool" in available_tools and "datetime_tool" not in selected_tools:
+                        selected_tools.append("datetime_tool")
+                        tool_arguments["datetime_tool"] = {"query": query}
+
+                # Direct match with registered tools
+                for t in available_tools:
+                    clean_t = t.replace("get_", "").replace("_", " ")
+                    if (action and t == action) or (t in instr_lower) or (clean_t in instr_lower):
+                        if t not in selected_tools:
+                            selected_tools.append(t)
+                            if t not in tool_arguments:
+                                tool_arguments[t] = {}
+
+            # Ensure all selected tools have valid argument dicts
+            for t in selected_tools:
+                if t not in tool_arguments:
+                    tool_arguments[t] = {}
+
+
+            return DynamicPlanOutput(
+                plan=plan_steps,
+                selected_tools=selected_tools,
+                tool_arguments=tool_arguments,
+                reasoning=f"Executing structured procedure from stored skill '{skill.name}' (v{skill.version})."
+            )
 
         # Check for Math / Calculator calculation task
         if any(c in q_lower for c in ["%", "+", "-", "*", "/", "calculate", "math", "increase from"]) or intent.intent == "calculator":
@@ -91,16 +149,26 @@ class WorkflowPlanner:
                 reasoning="Unsupported external capability requested; no matching tool in allow-list."
             )
 
-        # Fallback LLM structured plan generation
+        # Fallback LLM structured plan generation using safe dynamic planning prompt
         prompt = f"User Request: '{query}'. Intent: '{intent.intent}'. Available Tools: {available_tools}."
         llm_out = llm_client.generate_structured(
             prompt=prompt,
             schema=DynamicPlanOutput,
-            system_prompt=DYNAMIC_PLANNING_PROMPT.format(available_tools=available_tools),
+            system_prompt=get_dynamic_planning_prompt(available_tools),
             temperature=0.0
         )
 
-        return llm_out
+        # Validate selected tools against registry: selected_tools ⊆ available_tools
+        validated_tools = [t for t in llm_out.selected_tools if t in available_tools]
+        validated_args = {t: llm_out.tool_arguments.get(t, {}) for t in validated_tools}
+
+        return DynamicPlanOutput(
+            plan=llm_out.plan or ["Step 1: Process user query"],
+            selected_tools=validated_tools,
+            tool_arguments=validated_args,
+            reasoning=llm_out.reasoning or "Dynamically planned execution."
+        )
 
 
 planner = WorkflowPlanner()
+

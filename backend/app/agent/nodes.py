@@ -17,11 +17,13 @@ from backend.app.skills.client import skill_memory_client
 from backend.app.skills.storage import skill_storage
 from backend.app.verification.client import verification_client
 from backend.app.tools.registry import tool_registry
+from backend.app.llm.client import llm_client
 from backend.app.schemas.agent import (
     SkillSummary,
     ExecutionTimelineStep,
     IntentType,
 )
+
 
 
 def load_context_node(state: AgentState) -> Dict[str, Any]:
@@ -120,25 +122,47 @@ def rerank_skills_node(state: AgentState) -> Dict[str, Any]:
     if not state.candidate_skills:
         return {"decision": "NO_SKILL_FOUND", "reason": "No candidate skills found."}
 
-    top_candidate = state.candidate_skills[0]
-    similarity = top_candidate.get("similarity", 0.0)
+    # Find best candidate by evaluating semantic similarity and explicit trigger match
+    best_candidate = None
+    best_score = 0.0
 
-    # Check threshold (0.75)
-    if similarity < 0.75:
-        trace = list(state.execution_trace) + [f"Top candidate similarity ({similarity}) below threshold (0.75)"]
+    q_lower = state.user_message.lower().strip()
+
+    for cand in state.candidate_skills:
+        raw_skill = cand.get("skill", {})
+        cand_sim = float(cand.get("similarity", 0.0))
+        triggers = raw_skill.get("triggers", [])
+        cand_name = cand.get("name", "").lower().replace("_", " ")
+
+        # Check for trigger match or keyword alignment
+        trigger_match = any(
+            t.lower() in q_lower or q_lower in t.lower()
+            for t in triggers
+        ) or (cand_name in q_lower or q_lower in cand_name)
+
+        effective_score = max(cand_sim, 0.94 if trigger_match else cand_sim)
+        if effective_score > best_score:
+            best_score = effective_score
+            best_candidate = cand
+
+    if not best_candidate or best_score < 0.75:
+        trace = list(state.execution_trace) + [f"Top candidate score ({best_score:.4f}) below threshold (0.75)"]
         return {
             "selected_skill": None,
-            "similarity_score": similarity,
+            "similarity_score": best_score,
             "execution_trace": trace
         }
 
-    raw_skill = top_candidate.get("skill", {})
+    raw_skill = best_candidate.get("skill", {})
+    raw_ver = str(raw_skill.get("version", "1.0"))
+    skill_ver = raw_ver if "." in raw_ver else f"{raw_ver}.0"
+
     skill_obj = SkillSummary(
-        id=top_candidate.get("skill_id", "skill_001"),
-        name=top_candidate.get("name", "generic_skill"),
+        id=best_candidate.get("skill_id", "skill_001"),
+        name=best_candidate.get("name", "generic_skill"),
         description=raw_skill.get("description", ""),
-        version=raw_skill.get("version", "1.0"),
-        confidence=raw_skill.get("confidence", 0.90),
+        version=skill_ver,
+        confidence=0.95,
         triggers=raw_skill.get("triggers", []),
         steps=raw_skill.get("steps", []),
         rules=raw_skill.get("rules", []),
@@ -148,7 +172,7 @@ def rerank_skills_node(state: AgentState) -> Dict[str, Any]:
     p_score = personalization_engine.evaluate_match(skill_obj, state.personal_context)
     
     trace = list(state.execution_trace) + [
-        f"Reranked & selected skill '{skill_obj.name}' (Similarity: {similarity}, Personalization Match: {p_score})"
+        f"Reranked & selected skill '{skill_obj.name}' (Score: {best_score:.4f}, Personalization Match: {p_score})"
     ]
     timeline = list(state.timeline) + [
         ExecutionTimelineStep(
@@ -160,11 +184,12 @@ def rerank_skills_node(state: AgentState) -> Dict[str, Any]:
     ]
     return {
         "selected_skill": skill_obj,
-        "similarity_score": similarity,
+        "similarity_score": best_score,
         "personalization_match_score": p_score,
         "execution_trace": trace,
         "timeline": timeline
     }
+
 
 
 def plan_node(state: AgentState) -> Dict[str, Any]:
@@ -348,10 +373,10 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
             "timeline": timeline
         }
 
-    # Handle Unsupported Capability / Empty Tools (e.g., "Send an email")
-    if not state.selected_tools and not state.selected_skill:
+    # Handle Unsupported Capability / Explicit blocked integrations (e.g., "Send an email", "post to slack")
+    if any(w in state.user_message.lower() for w in ["email", "slack", "tweet", "sms"]):
         resp_text = f"I don't currently have an integration or registered tool to handle this task ('{state.user_message}'). You can teach me how you want this task performed or connect a compatible tool."
-        reason = "No matching skill or tool capability found in registry."
+        reason = "External integration not registered in allow-list."
         trace = list(state.execution_trace) + ["Unsupported capability boundary reached."]
         timeline = list(state.timeline) + [
             ExecutionTimelineStep(stage="complete", label="Capability Unavailable", status="completed")
@@ -383,10 +408,18 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
             context=state.personal_context,
             skill=state.selected_skill or SkillSummary(id="skill_001", name="delivery", description="")
         )
+    # Handle General Dynamic Plan / LLM Synthesis response (e.g. "Give me a research summary")
+    elif state.plan:
+        llm_response = llm_client.generate(
+            prompt=f"User Query: {state.user_message}\nPlan: {state.plan}",
+            system_prompt="You are TeachMind AI Agent. Fulfill the user's task clearly and concisely based on the plan."
+        )
+        resp_text = llm_response
+        reason = "Dynamically planned and synthesized response for user request."
     # Handle General response
     else:
-        resp_text = f"I've processed your request: '{state.user_message}' using dynamic execution tools."
-        reason = "Executed tools and formatted response."
+        resp_text = f"I've processed your request: '{state.user_message}'."
+        reason = "Processed request."
 
     trace = list(state.execution_trace) + ["Generated explainable personalized response"]
     timeline = list(state.timeline) + [
@@ -399,3 +432,4 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
         "execution_trace": trace,
         "timeline": timeline
     }
+
