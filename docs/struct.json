@@ -1,0 +1,33 @@
+POST /skills/search
+Request:
+{
+"query": "user's current task",
+"top_k": 3
+}
+
+Response:
+{
+  "query": "user's current task",
+  "results": [
+    {
+      "skill_id": "skill_001",
+      "name": "Process Monthly Report",
+      "similarity": 0.91,
+      "skill": {
+        "skill_id": "skill_001",
+        "name": "Process Monthly Report",
+        "description": "...",
+        "triggers": [],
+        "steps": [],
+        "rules": [],
+        "examples": [],
+        "version": 1,
+        "verified": true,
+        "metadata": {
+          "created_at": "...",
+          "updated_at": "..."
+        }
+      }
+    }
+  ]
+}
