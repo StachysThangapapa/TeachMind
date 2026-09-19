@@ -73,12 +73,16 @@
     "id": "skill_delivery_001",
     "name": "personalized_delivery_summary",
     "description": "Delivery summary skill",
-    "version": "1.6",
+    "version": "1.7",
     "confidence": 0.95,
     "triggers": [],
     "steps": [],
     "rules": [],
     "exceptions": [
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
       {
         "condition": "Actually, put deadlines before meetings.",
         "action": "override_preference"
@@ -151,5 +155,17 @@
       }
     ],
     "user_id": "u_acc_2"
+  },
+  "user_default:generic_skill": {
+    "id": "skill_001",
+    "name": "generic_skill",
+    "description": "",
+    "version": "1.0",
+    "confidence": 0.9,
+    "triggers": [],
+    "steps": [],
+    "rules": [],
+    "exceptions": [],
+    "user_id": "user_default"
   }
 }
