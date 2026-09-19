@@ -3,14 +3,14 @@ FastAPI Router for TeachMind AI Agent Endpoints.
 Exposes /agent/chat, /agent/execute, /agent/confirm, /agent/teach, and /agent/correct.
 """
 
-from fastapi import APIRouter, HTTPException, Status
+from fastapi import APIRouter, HTTPException, status
 from backend.app.schemas.agent import (
     TaskExecutionRequest,
     TaskExecutionResponse,
     ConfirmActionRequest,
     ConfirmActionResponse,
-    AgentState,
 )
+from backend.app.agent.state import AgentState
 from backend.app.agent.graph import agent_graph
 from backend.app.tools.registry import tool_registry
 
@@ -54,7 +54,7 @@ async def execute_agent_task(request: TaskExecutionRequest) -> TaskExecutionResp
         )
     except Exception as e:
         raise HTTPException(
-            status_code=Status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Agent execution error: {str(e)}"
         )
 
