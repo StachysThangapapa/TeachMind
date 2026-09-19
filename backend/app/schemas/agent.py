@@ -80,9 +80,9 @@ class PersonalContext(BaseModel):
 
 
 class SkillSummary(BaseModel):
-    id: str
-    name: str
-    description: str
+    id: str = "skill_001"
+    name: str = "generic_skill"
+    description: str = ""
     version: str = "1.0"
     confidence: float = 0.90
     triggers: List[str] = Field(default_factory=list)

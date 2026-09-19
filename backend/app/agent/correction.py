@@ -64,8 +64,7 @@ class CorrectionEngine:
 
         # Trigger regression verification suite
         verification_report = verification_client.verify_skill(
-            skill_id=skill.id,
-            agent_runner=mock_agent_runner,
+            skill=updated_skill,
             is_regression=True
         )
 

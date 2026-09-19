@@ -1,6 +1,6 @@
 """
 FastAPI Router for TeachMind AI Agent Endpoints.
-Exposes /agent/chat, /agent/execute, /agent/confirm, /agent/teach, and /agent/correct.
+Exposes /agent/chat, /agent/execute, /agent/teach, /agent/correct, and /agent/confirm.
 """
 
 from fastapi import APIRouter, HTTPException, status
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/agent", tags=["AI Agent"])
 async def execute_agent_task(request: TaskExecutionRequest) -> TaskExecutionResponse:
     """
     Executes a user request through the personalized agent state graph.
+    Handles normal requests, teaching instructions, corrections, and calculations.
     """
     try:
         initial_state = AgentState(
@@ -59,11 +60,21 @@ async def execute_agent_task(request: TaskExecutionRequest) -> TaskExecutionResp
         )
 
 
+@router.post("/teach", response_model=TaskExecutionResponse)
+async def teach_agent_skill(request: TaskExecutionRequest) -> TaskExecutionResponse:
+    """Explicit endpoint for teaching a new skill."""
+    return await execute_agent_task(request)
+
+
+@router.post("/correct", response_model=TaskExecutionResponse)
+async def correct_agent_behavior(request: TaskExecutionRequest) -> TaskExecutionResponse:
+    """Explicit endpoint for submitting a correction."""
+    return await execute_agent_task(request)
+
+
 @router.post("/confirm", response_model=ConfirmActionResponse)
 async def confirm_agent_action(request: ConfirmActionRequest) -> ConfirmActionResponse:
-    """
-    Handles confirmation response for mutating/high-impact actions.
-    """
+    """Handles user confirmation response for mutating/high-impact actions."""
     if not request.confirmed:
         return ConfirmActionResponse(
             status="cancelled",
@@ -71,7 +82,6 @@ async def confirm_agent_action(request: ConfirmActionRequest) -> ConfirmActionRe
             action_id=request.action_id
         )
 
-    # Execute confirming action (e.g. create_calendar_event)
     exec_res = tool_registry.execute_tool(
         name="create_calendar_event",
         arguments={"title": "ML Project Meeting", "time": "16:00", "date": "tomorrow"},

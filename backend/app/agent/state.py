@@ -36,7 +36,9 @@ class AgentState(BaseModel):
     
     # Tool Execution & Permissions
     selected_tool: Optional[str] = None
+    selected_tools: List[str] = Field(default_factory=list)
     tool_arguments: Dict[str, Any] = Field(default_factory=dict)
+    tool_results: Dict[str, Any] = Field(default_factory=dict)
     tool_result: Optional[Dict[str, Any]] = None
     requires_confirmation: bool = False
     action_id: Optional[str] = None

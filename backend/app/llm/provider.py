@@ -140,7 +140,7 @@ class MockLLMProvider(BaseLLMProvider):
                     entities={"target": "tracking_id", "condition": "only_when_requested"},
                     confidence=0.96
                 )
-            elif "when i ask" in p_lower or "teach" in p_lower:
+            elif "when i ask" in p_lower or "whenever" in p_lower or "teach" in p_lower:
                 return schema(
                     type="TEACH_REQUEST",
                     intent="teach_new_workflow",
@@ -154,12 +154,47 @@ class MockLLMProvider(BaseLLMProvider):
                     entities={},
                     confidence=0.98
                 )
+            elif "never mind" in p_lower or "cancel" in p_lower:
+                return schema(
+                    type="CANCELLATION",
+                    intent="cancel_action",
+                    entities={},
+                    confidence=0.95
+                )
+            elif "briefing" in p_lower or "morning" in p_lower or "agenda" in p_lower:
+                return schema(
+                    type="NORMAL_REQUEST",
+                    intent="morning_briefing",
+                    entities={"date": "today"},
+                    confidence=0.94
+                )
+            elif "delivery" in p_lower or "deliveries" in p_lower or "package" in p_lower:
+                return schema(
+                    type="NORMAL_REQUEST",
+                    intent="check_deliveries",
+                    entities={"date": "today"},
+                    confidence=0.94
+                )
+            elif any(c in p_lower for c in ["%", "+", "-", "*", "/", "calculate", "math", "increase from"]):
+                return schema(
+                    type="NORMAL_REQUEST",
+                    intent="calculator",
+                    entities={"expression": prompt},
+                    confidence=0.95
+                )
+            elif any(w in p_lower for w in ["date", "time", "clock", "day of the week", "today"]):
+                return schema(
+                    type="NORMAL_REQUEST",
+                    intent="datetime_lookup",
+                    entities={"query": prompt},
+                    confidence=0.95
+                )
             else:
                 return schema(
                     type="NORMAL_REQUEST",
-                    intent="check_deliveries" if "deliveries" in p_lower else "morning_briefing",
-                    entities={"date": "today"},
-                    confidence=0.94
+                    intent="unsupported_action",
+                    entities={"query": prompt},
+                    confidence=0.85
                 )
 
         try:
