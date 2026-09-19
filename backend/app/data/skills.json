@@ -73,12 +73,20 @@
     "id": "skill_delivery_001",
     "name": "personalized_delivery_summary",
     "description": "Delivery summary skill",
-    "version": "1.4",
+    "version": "1.6",
     "confidence": 0.95,
     "triggers": [],
     "steps": [],
     "rules": [],
     "exceptions": [
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
       {
         "condition": "Actually, put deadlines before meetings.",
         "action": "override_preference"
