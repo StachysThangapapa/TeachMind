@@ -1,0 +1,25 @@
+{
+  "skill": "refund_processing",
+  "cases": [
+    {
+      "input": "Product purchased 3 days ago.",
+      "expected": "approve"
+    },
+    {
+      "input": "Product purchased 7 days ago.",
+      "expected": "approve"
+    },
+    {
+      "input": "Normal product purchased 15 days ago.",
+      "expected": "reject"
+    },
+    {
+      "input": "Clearance product purchased 2 days ago.",
+      "expected": "reject"
+    },
+    {
+      "input": "Clearance product purchased 2 days ago and arrived damaged.",
+      "expected": "approve"
+    }
+  ]
+}
