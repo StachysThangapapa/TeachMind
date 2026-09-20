@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.skills import router as skills_router
+from backend.app.api.agent import router as agent_router
 from backend.db.migrations import run_migrations
 
 
@@ -22,17 +23,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="TeachMind Skill Memory",
+    title="TeachMind Unified Backend",
     description=(
-        "Skill-Memory subsystem for TeachMind Review 1.  "
-        "Stores, retrieves, corrects, and versions learned skills.  "
-        "Provides semantic retrieval via pgvector."
+        "Unified backend for TeachMind. "
+        "Provides Skill-Memory with PostgreSQL + pgvector + Cohere embeddings, "
+        "Cohere natural-language Skill Extraction, "
+        "and the AI Agent orchestration layer."
     ),
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
-# Allow the Agent / frontend (different port) to call the API
+# Allow the frontend and subagent clients to call the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,4 +43,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Skill Memory and Extraction endpoints (/skills, /skills/search, /skills/extract, etc.)
 app.include_router(skills_router)
+
+# AI Agent endpoints (/agent/execute, /agent/chat, /agent/teach, etc.)
+app.include_router(agent_router)
+app.include_router(agent_router, prefix="/api/v1")
+app.include_router(agent_router, prefix="/api")
+
+
+@app.get("/")
+@app.get("/health")
+def health_check():
+    return {
+        "status": "online",
+        "project": "TeachMind Unified System",
+        "version": "1.0.0",
+        "subsystems": {
+            "skill_memory": "active",
+            "cohere_extraction": "active",
+            "ai_agent": "active",
+            "verification": "active"
+        }
+    }

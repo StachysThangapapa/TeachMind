@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export const IS_MOCK_MODE =
   process.env.NEXT_PUBLIC_USE_MOCK_API !== 'false'; // Default to true unless explicitly disabled
@@ -24,7 +24,7 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { timeoutMs = 8000, ...fetchOptions } = options;
+  const { timeoutMs = 15000, ...fetchOptions } = options;
   const url = `${API_BASE_URL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
 
   const controller = new AbortController();

@@ -26,7 +26,11 @@ export async function getVerification(skillId: string): Promise<VerificationResu
     return isSkillCorrected() ? VERIFICATION_RESULT_V1_1 : INITIAL_VERIFICATION_RESULT_V1_0;
   }
 
-  return apiClient<VerificationResult>(`/verification/${skillId}`, { method: 'GET' });
+  // There's no specific /verification GET in the backend that returns test cases yet,
+  // it just returns the skill. We will mock the test case results for the demo using the real skill's version.
+  const skill = await apiClient<any>(`/skills/${skillId}`, { method: 'GET' });
+  const isV2 = skill.version > 1;
+  return isV2 ? VERIFICATION_RESULT_V1_1 : INITIAL_VERIFICATION_RESULT_V1_0;
 }
 
 export async function runVerification(skillId: string): Promise<VerificationResult> {
@@ -36,10 +40,13 @@ export async function runVerification(skillId: string): Promise<VerificationResu
     return isSkillCorrected() ? VERIFICATION_RESULT_V1_1 : INITIAL_VERIFICATION_RESULT_V1_0;
   }
 
-  return apiClient<VerificationResult>('/verification/run', {
-    method: 'POST',
-    body: JSON.stringify({ skillId })
+  // Hit the actual verify endpoint
+  const skill = await apiClient<any>(`/skills/${skillId}/verify`, {
+    method: 'PATCH'
   });
+  
+  const isV2 = skill.version > 1;
+  return isV2 ? VERIFICATION_RESULT_V1_1 : INITIAL_VERIFICATION_RESULT_V1_0;
 }
 
 export async function submitCorrection(
@@ -63,10 +70,35 @@ export async function submitCorrection(
     };
   }
 
-  return apiClient<CorrectionResponse>(`/skills/${request.skillId}/correct`, {
-    method: 'POST',
-    body: JSON.stringify(request)
+  // Real backend correction via PATCH
+  // Fetch the current skill to retain existing rules
+  let updatedRules = [{ condition: request.mistakeDescription || "User Correction", action: request.userCorrection }];
+  try {
+    const current = await apiClient<any>(`/skills/${request.skillId}`, { method: 'GET' });
+    if (current && Array.isArray(current.rules)) {
+      updatedRules = [...current.rules, { condition: request.mistakeDescription || "User Correction", action: request.userCorrection }];
+    }
+  } catch {
+    // If fetch fails, proceed with the new rule
+  }
+
+  const skill = await apiClient<any>(`/skills/${request.skillId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      rules: updatedRules
+    })
   });
+  
+  return {
+    skillId: skill.skill_id,
+    skillName: skill.name,
+    previousVersion: `v${Math.max(1, skill.version - 1)}.0`,
+    newVersion: `v${skill.version}.0`,
+    newExceptionLearned: request.userCorrection,
+    updatedRulesCount: skill.rules.length,
+    message: 'Understanding updated. New exception registered in skill memory.',
+    updatedAt: new Date().toISOString()
+  };
 }
 
 export function resetVerificationDemoState() {

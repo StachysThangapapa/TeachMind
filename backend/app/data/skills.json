@@ -1,0 +1,172 @@
+{
+  "u_acc_2:personalized_delivery_summary": {
+    "id": "skill_delivery_001",
+    "name": "personalized_delivery_summary",
+    "description": "Delivery summary skill",
+    "version": "1.4",
+    "confidence": 0.95,
+    "triggers": [],
+    "steps": [],
+    "rules": [],
+    "exceptions": [
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      }
+    ],
+    "user_id": "u_acc_2"
+  },
+  "user_acceptance_demo:personalized_morning_briefing": {
+    "id": "skill_001",
+    "name": "personalized_morning_briefing",
+    "description": "Prepare a personalized morning briefing combining calendar, tasks, and deliveries.",
+    "version": "1.0",
+    "confidence": 0.9,
+    "triggers": [
+      "prepare my morning briefing",
+      "morning briefing",
+      "what do i have today"
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "action": "get_calendar_events",
+        "instruction": "Check calendar events"
+      },
+      {
+        "step": 2,
+        "action": "get_pending_tasks",
+        "instruction": "Check pending tasks"
+      },
+      {
+        "step": 3,
+        "action": "get_today_deliveries",
+        "instruction": "Check package deliveries"
+      }
+    ],
+    "rules": [
+      {
+        "condition": "item is urgent",
+        "action": "mention_first"
+      },
+      {
+        "condition": "delivery is present",
+        "action": "hide_tracking_id_unless_requested"
+      }
+    ],
+    "exceptions": [],
+    "user_id": "user_acceptance_demo"
+  },
+  "user_acceptance_demo:personalized_delivery_summary": {
+    "id": "skill_delivery_001",
+    "name": "personalized_delivery_summary",
+    "description": "Delivery summary skill",
+    "version": "1.7",
+    "confidence": 0.95,
+    "triggers": [],
+    "steps": [],
+    "rules": [],
+    "exceptions": [
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      },
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      }
+    ],
+    "user_id": "user_acceptance_demo"
+  },
+  "u_acc_2:personalized_morning_briefing": {
+    "id": "skill_001",
+    "name": "personalized_morning_briefing",
+    "description": "Prepare a personalized morning briefing combining calendar, tasks, and deliveries.",
+    "version": "1.1",
+    "confidence": 0.95,
+    "triggers": [
+      "prepare my morning briefing",
+      "morning briefing",
+      "what do i have today"
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "action": "get_calendar_events",
+        "instruction": "Check calendar events"
+      },
+      {
+        "step": 2,
+        "action": "get_pending_tasks",
+        "instruction": "Check pending tasks"
+      },
+      {
+        "step": 3,
+        "action": "get_today_deliveries",
+        "instruction": "Check package deliveries"
+      }
+    ],
+    "rules": [
+      {
+        "condition": "item is urgent",
+        "action": "mention_first"
+      },
+      {
+        "condition": "delivery is present",
+        "action": "hide_tracking_id_unless_requested"
+      }
+    ],
+    "examples": [],
+    "exceptions": [
+      {
+        "condition": "Actually, put deadlines before meetings.",
+        "action": "override_preference"
+      }
+    ],
+    "user_id": "u_acc_2"
+  },
+  "user_default:generic_skill": {
+    "id": "skill_001",
+    "name": "generic_skill",
+    "description": "",
+    "version": "1.0",
+    "confidence": 0.9,
+    "triggers": [],
+    "steps": [],
+    "rules": [],
+    "exceptions": [],
+    "user_id": "user_default"
+  }
+}

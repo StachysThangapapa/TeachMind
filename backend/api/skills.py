@@ -22,6 +22,8 @@ from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.repositories.skill_repository import SkillRepository
 from backend.schemas.skill import (
+    ExtractRequest,
+    ExtractResponse,
     SearchRequest,
     SearchResponse,
     SkillCreate,
@@ -33,6 +35,10 @@ from backend.schemas.skill import (
 from backend.services.embedding_service import (
     CohereEmbeddingProvider,
     EmbeddingProvider,
+)
+from backend.services.extraction_service import (
+    CohereSkillExtractionProvider,
+    SkillExtractionProvider,
 )
 from backend.services.skill_service import SkillService
 
@@ -48,6 +54,12 @@ def get_embedding_provider() -> EmbeddingProvider:
     return CohereEmbeddingProvider()
 
 
+@lru_cache
+def get_extraction_provider() -> SkillExtractionProvider:
+    """Singleton extraction provider — extracts canonical skill JSON via Cohere."""
+    return CohereSkillExtractionProvider()
+
+
 def get_skill_service(
     db: Session = Depends(get_db),
     embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
@@ -55,6 +67,28 @@ def get_skill_service(
     """Per-request service with its own DB session + shared embedding provider."""
     repository = SkillRepository(db)
     return SkillService(repository, embedding_provider)
+
+
+# ── POST /skills/extract ───────────────────────────────────────────────
+
+
+@router.post("/extract", response_model=ExtractResponse)
+def extract_skill(
+    data: ExtractRequest,
+    provider: SkillExtractionProvider = Depends(get_extraction_provider),
+) -> ExtractResponse:
+    """Extract a canonical Skill JSON from natural-language teaching text.
+
+    Uses Cohere structured JSON output and schema enforcement.
+    Does NOT store the skill in PostgreSQL (storage is handled by POST /skills).
+    """
+    try:
+        extracted = provider.extract_skill(data.text)
+        return ExtractResponse(skill=extracted)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 # ── POST /skills ───────────────────────────────────────────────────────

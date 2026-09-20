@@ -168,3 +168,16 @@ class SkillVersionResponse(BaseModel):
     examples: List[ExampleSchema]
     verified: bool
     created_at: datetime
+
+
+class ExtractRequest(BaseModel):
+    """POST /skills/extract request."""
+
+    text: str = Field(..., min_length=1, description="Natural language teaching instruction from the user")
+
+
+class ExtractResponse(BaseModel):
+    """POST /skills/extract response containing complete canonical Skill JSON."""
+
+    skill: SkillResponse
+

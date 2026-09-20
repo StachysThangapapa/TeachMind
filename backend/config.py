@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     cohere_api_key: str = ""
     embedding_model: str = "embed-english-light-v3.0"
     embedding_dimension: int = 384
+    extraction_model: str = "command-r-08-2024"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Icons } from "@/components/Icons";
-import { getSkillById } from "@/lib/api/skills";
+import { getSkillById, getSkillVersions } from "@/lib/api/skills";
 import { CanonicalSkill } from "@/lib/types/skill";
 
 export default function SkillDetailPage({
@@ -16,12 +16,22 @@ export default function SkillDetailPage({
   const resolvedParams = use(params);
   const [skill, setSkill] = useState<CanonicalSkill | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [versions, setVersions] = useState<any[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
   useEffect(() => {
     getSkillById(resolvedParams.id)
       .then((data) => setSkill(data))
       .catch((err) => console.error(err))
       .finally(() => setIsLoading(false));
+      
+    setIsLoadingVersions(true);
+    getSkillVersions(resolvedParams.id)
+      .then((data) => setVersions(data))
+      .catch((err) => console.error(err))
+      .finally(() => setIsLoadingVersions(false));
   }, [resolvedParams.id]);
 
   if (isLoading) {
@@ -189,7 +199,49 @@ export default function SkillDetailPage({
                 <Icons.Sliders className="h-4 w-4 text-amber-400" />
                 <span>Teach Correction</span>
               </Link>
+
+              <button
+                onClick={() => setShowVersions(!showVersions)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition ml-auto"
+              >
+                <Icons.Layers className="h-4 w-4 text-emerald-400" />
+                <span>{showVersions ? "Hide Versions" : "Version History"}</span>
+              </button>
             </div>
+
+            {/* VERSION HISTORY */}
+            {showVersions && (
+              <div className="mt-6 rounded-2xl border border-slate-800 bg-[#0f172a] p-5 shadow-lg">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-4">
+                  Version History
+                </h4>
+                {isLoadingVersions ? (
+                  <p className="text-xs text-slate-500">Loading versions...</p>
+                ) : versions.length === 0 ? (
+                  <p className="text-xs text-slate-500">No version history found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {versions.map((v) => (
+                      <div key={v.version} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-slate-800/80 bg-slate-900/60">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-emerald-400 font-bold text-xs">v{v.version}.0</span>
+                            <span className="text-white text-sm font-semibold">{v.name}</span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">{v.rules?.length || 0} rules, {v.examples?.length || 0} examples</p>
+                        </div>
+                        <div className="text-right mt-2 sm:mt-0">
+                          <p className="text-[10px] text-slate-500">{new Date(v.created_at).toLocaleString()}</p>
+                          <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold ${v.verified ? 'bg-emerald-950/80 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                            {v.verified ? "Verified" : "Unverified"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>

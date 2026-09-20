@@ -11,11 +11,10 @@ export async function executeTask(
   onTimelineUpdate?: (step: ExecutionTimelineStep) => void
 ): Promise<TaskExecutionResult> {
   if (IS_MOCK_MODE) {
-    // Simulate real step-by-step reasoning timeline
     const steps: ExecutionTimelineStep[] = [
       {
         stage: 'searching_memory',
-        label: 'Searching Skill Memory',
+        label: 'Searching Skill Memory (Mock)',
         status: 'active',
         detail: `Evaluating query against indexed skills...`
       },
@@ -45,13 +44,12 @@ export async function executeTask(
       }
     ];
 
-    // Emit timeline events progressively
     for (let i = 0; i < steps.length; i++) {
       if (onTimelineUpdate) {
         steps[i].status = 'active';
         onTimelineUpdate({ ...steps[i] });
       }
-      await new Promise((res) => setTimeout(res, 500));
+      await new Promise((res) => setTimeout(res, 400));
       steps[i].status = 'completed';
       if (onTimelineUpdate) {
         onTimelineUpdate({ ...steps[i] });
@@ -72,30 +70,76 @@ export async function executeTask(
       };
     }
 
-    if (q.includes('clearance')) {
-      return {
-        ...MOCK_TASK_EXECUTION_RESULT,
-        decision: 'REJECT',
-        reason: 'Clearance items are marked as final sale and cannot be refunded after standard processing.',
-        similarity: 0.91,
-        confidence: 0.90,
-        overrideApplied: false
-      };
-    }
-
     return {
       ...MOCK_TASK_EXECUTION_RESULT,
       decision: 'APPROVE',
-      reason: 'Purchase within eligible 7-day return policy with verified customer receipt.',
-      similarity: 0.95,
-      confidence: 0.94,
+      reason: 'Standard workflow execution approved.',
+      similarity: 0.91,
+      confidence: 0.90,
       overrideApplied: false
     };
   }
 
-  // Real backend call: POST /agent/execute
-  return apiClient<TaskExecutionResult>('/agent/execute', {
-    method: 'POST',
-    body: JSON.stringify(request)
-  });
+  // Initial timeline notification
+  if (onTimelineUpdate) {
+    onTimelineUpdate({
+      stage: 'searching_memory',
+      label: 'Searching Skill Memory (pgvector)',
+      status: 'active',
+      detail: `Calling unified backend /agent/execute for "${request.query}"...`
+    });
+  }
+
+  try {
+    const raw = await apiClient<any>('/agent/execute', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+
+    // Stream backend timeline steps if provided
+    if (Array.isArray(raw.timeline) && onTimelineUpdate) {
+      raw.timeline.forEach((step: ExecutionTimelineStep) => {
+        onTimelineUpdate(step);
+      });
+    }
+
+    const skillObj = raw.skill_used || {};
+    const appliedRules: string[] = (skillObj.rules || []).map((r: any) =>
+      typeof r === 'string' ? r : `${r.condition || ''} → ${r.action || ''}`.trim()
+    );
+    const exceptionsChecked: string[] = (skillObj.exceptions || []).map((e: any) =>
+      typeof e === 'string' ? e : e.condition || ''
+    );
+
+    const displayName = skillObj.name
+      ? skillObj.name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+      : 'General Assistant Task';
+
+    return {
+      decision: (raw.decision === 'PROCESSED' || raw.decision === 'APPROVE') ? 'APPROVE' : (raw.decision || 'PROCESSED'),
+      reason: raw.message || raw.reason || 'Task executed successfully.',
+      skillUsed: {
+        id: skillObj.id || raw.action_id || 'skill_generic',
+        name: skillObj.name || 'generic_task',
+        displayName: displayName,
+        version: skillObj.version ? (skillObj.version.startsWith('v') ? skillObj.version : `v${skillObj.version}`) : 'v1.0'
+      },
+      similarity: typeof raw.similarity === 'number' ? raw.similarity : 0.0,
+      confidence: typeof raw.confidence === 'number' ? raw.confidence : 0.90,
+      appliedRules: appliedRules,
+      exceptionsChecked: exceptionsChecked,
+      overrideApplied: Boolean(raw.personalization && Object.keys(raw.personalization).length > 0),
+      timeline: raw.timeline || []
+    };
+  } catch (err: unknown) {
+    if (onTimelineUpdate) {
+      onTimelineUpdate({
+        stage: 'error',
+        label: 'Agent Execution Failed',
+        status: 'failed',
+        detail: (err as Error)?.message || 'Failed to communicate with unified backend.'
+      });
+    }
+    throw err;
+  }
 }
